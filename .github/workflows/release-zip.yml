@@ -1,0 +1,35 @@
+name: Build release ZIP
+on:
+  release:
+    types: [published]
+permissions:
+  contents: write
+jobs:
+  package-and-upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the released version
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          fetch-depth: 1
+      - name: Build the installable ZIP
+        run: |
+          set -euo pipefail
+          package_dir="$(mktemp -d)"
+          mkdir -p "$package_dir/web-para-pruebas"
+          cp web-para-pruebas.php readme.md "$package_dir/web-para-pruebas/"
+          (cd "$package_dir" && zip -qr "$GITHUB_WORKSPACE/web-para-pruebas.zip" web-para-pruebas)
+      - name: Upload ZIP to this release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPLOAD_URL_TEMPLATE: ${{ github.event.release.upload_url }}
+        run: |
+          set -euo pipefail
+          upload_url="${UPLOAD_URL_TEMPLATE%%\{*}?name=web-para-pruebas.zip"
+          curl --fail --silent --show-error --retry 3 --request POST "$upload_url" \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            --header "Accept: application/vnd.github+json" \
+            --header "Content-Type: application/zip" \
+            --data-binary @web-para-pruebas.zip
+
